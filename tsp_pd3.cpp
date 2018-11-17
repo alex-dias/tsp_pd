@@ -71,18 +71,20 @@ void printpairsPD(vector<vector<point2D>> pairsPD) {
 	}
 }
 
-void insertBestPosition(vector<point2D>& pairsPD, vector<point2D> trivial, vector<point2D> lastPairCluster) {
+// Dado um clusters e um ciclo trivial, essa funcao verifica qual a melhor forma e posicao de inserir esse ciclo trivial no cluster
+// Alem disso, tambem atualiza o lastPairCluster com o ciclo recem inserido
+void insertBestPosition(vector<point2D>& cluster, vector<point2D> trivial, vector<point2D> lastPairCluster) {
 
 	float costP, costD, costPD, costPD2, 
 		lowP = std::numeric_limits<float>::infinity(), 
 		lowD = std::numeric_limits<float>::infinity(), 
 		lowPD = std::numeric_limits<float>::infinity(),
 		lowPD2 = std::numeric_limits<float>::infinity();
-	int vizinho, insertP, insertD, insertPD;
+	int vizinho, insertP, insertD, insertPD, insertPD2;
 
-	for (int i = 0; i < pairsPD.size(); i++) {
+	for (int i = 0; i < cluster.size(); i++) {
 
-		if (i == pairsPD.size() - 1) {
+		if (i == cluster.size() - 1) {
 			vizinho = 0;
 		}
 		else {
@@ -90,10 +92,10 @@ void insertBestPosition(vector<point2D>& pairsPD, vector<point2D> trivial, vecto
 			vizinho++;
 		}
 
-		costP = pointDist(trivial[0], pairsPD[i]) + pointDist(trivial[0], pairsPD[vizinho]) - pointDist(pairsPD[i], pairsPD[vizinho]);
-		costD = pointDist(trivial[1], pairsPD[i]) + pointDist(trivial[1], pairsPD[vizinho]) - pointDist(pairsPD[i], pairsPD[vizinho]);
-		costPD = pointDist(trivial[0], pairsPD[i]) + pointDist(trivial[1], pairsPD[vizinho]) + pointDist(trivial[0], trivial[1]) - pointDist(pairsPD[i], pairsPD[vizinho]);
-		costPD2 = pointDist(trivial[0], pairsPD[vizinho]) + pointDist(trivial[1], pairsPD[i]) + pointDist(trivial[0], trivial[1]) - pointDist(pairsPD[i], pairsPD[vizinho]);
+		costP = pointDist(trivial[0], cluster[i]) + pointDist(trivial[0], cluster[vizinho]) - pointDist(cluster[i], cluster[vizinho]);
+		costD = pointDist(trivial[1], cluster[i]) + pointDist(trivial[1], cluster[vizinho]) - pointDist(cluster[i], cluster[vizinho]);
+		costPD = pointDist(trivial[0], cluster[i]) + pointDist(trivial[1], cluster[vizinho]) + pointDist(trivial[0], trivial[1]) - pointDist(cluster[i], cluster[vizinho]);
+		costPD2 = pointDist(trivial[0], cluster[vizinho]) + pointDist(trivial[1], cluster[i]) + pointDist(trivial[0], trivial[1]) - pointDist(cluster[i], cluster[vizinho]);
 
 		if (costP < lowP) {
 			lowP = costP;
@@ -109,7 +111,7 @@ void insertBestPosition(vector<point2D>& pairsPD, vector<point2D> trivial, vecto
 		}
 		if (costPD2 < lowPD2) {
 			lowPD2 = costPD2;
-			insertPD = i;
+			insertPD2 = i;
 		}
 	}
 
@@ -117,7 +119,7 @@ void insertBestPosition(vector<point2D>& pairsPD, vector<point2D> trivial, vecto
 		vector<point2D> vector2insert;
 		vector2insert.push_back(trivial[0]);
 		vector2insert.push_back(trivial[1]);
-		pairsPD.insert(pairsPD.begin() + insertP + 1, vector2insert.begin(), vector2insert.end());
+		cluster.insert(cluster.begin() + insertPD + 1, vector2insert.begin(), vector2insert.end());
 		lastPairCluster = vector2insert;
 	}
 	else {
@@ -125,41 +127,40 @@ void insertBestPosition(vector<point2D>& pairsPD, vector<point2D> trivial, vecto
 			vector<point2D> vector2insert;
 			vector2insert.push_back(trivial[1]);
 			vector2insert.push_back(trivial[0]);
-			pairsPD.insert(pairsPD.begin() + insertP + 1, vector2insert.begin(), vector2insert.end());
+			cluster.insert(cluster.begin() + insertPD2 + 1, vector2insert.begin(), vector2insert.end());
 			lastPairCluster = vector2insert;
 		}
 		else {
 			if (insertP < insertD) {
-				pairsPD.insert(pairsPD.begin() + insertP + 1, trivial[0]);
-				pairsPD.insert(pairsPD.begin() + insertD + 2, trivial[1]);
+				cluster.insert(cluster.begin() + insertP + 1, trivial[0]);
+				cluster.insert(cluster.begin() + insertD + 2, trivial[1]);
 				lastPairCluster[0] = trivial[0];
 				lastPairCluster[1] = trivial[1];
 			}
 			else {
-				pairsPD.insert(pairsPD.begin() + insertD + 1, trivial[1]);
-				pairsPD.insert(pairsPD.begin() + insertP + 2, trivial[0]);
+				cluster.insert(cluster.begin() + insertD + 1, trivial[1]);
+				cluster.insert(cluster.begin() + insertP + 2, trivial[0]);
 				lastPairCluster[1] = trivial[1];
 				lastPairCluster[0] = trivial[0];
 			}
 		}
 	}
-
 }
 
-void lowestCostMatrix(vector<vector<float>> costs, int &i, int &j) {
+// Percorre a matriz de custo dos pares nao indexados e encontra o menor custo
+void lowestCostMatrix(vector<distTotal> costs, int &i, int &j) {
 	float lowestCost = std::numeric_limits<float>::infinity();
 
 	for (int k = 0; k < costs.size(); k++) {
-		for (int l = 0; l < costs[k].size(); l++) {
-			if (costs[k][l] < lowestCost) {
-				lowestCost = costs[k][l];
-				i = k;
-				j = l;
-			}
+		if (costs[k].minTotal < lowestCost) {
+			lowestCost = costs[k].minTotal;
+			i = k;
+			j = costs[k].clusterIndex;
 		}
 	}
 }
 
+// Retorna a distancia entre dois pares, que a menor distancia entre os quatro pontos que compoem os dois pares
 float twoPairsCost(vector<point2D> pair1, vector<point2D> pair2) {
 	vector<float> costs; // costPD, costDP, costPP, costDD;
 
@@ -171,14 +172,39 @@ float twoPairsCost(vector<point2D> pair1, vector<point2D> pair2) {
 	return *min_element(std::begin(costs), std::end(costs));
 }
 
-void updatePairsCosts(vector<vector<point2D>> &pairsPD, vector<vector<float>> &costs, vector<vector<point2D>> &lastPairCluster, int clusterIndex) {
+distFloat pointToPair(vector<point2D> pairsPD, vector<point2D> lastPairCluster) {
+	distFloat dist;
+	dist.minP = pointDist(pairsPD[0], lastPairCluster[0]); //PP
+	float cost = pointDist(pairsPD[0], lastPairCluster[1]); //PD
+	if (cost < dist.minP)
+		dist.minP = cost;
+	dist.minD = pointDist(pairsPD[1], lastPairCluster[0]); //DP
+	cost = pointDist(pairsPD[1], lastPairCluster[1]); //DD
+	if (cost < dist.minD)
+		dist.minD = cost;
+	
+	return dist;
+}
+
+// Atualiza a distancia de todos os pares nao indexados em relacao a um cluster
+void updatePairsCosts(vector<vector<point2D>> &pairsPD, vector<vector<distFloat>> &costs, vector<vector<point2D>> &lastPairCluster, vector<distTotal> &total, int clusterIndex) {
 	for (int i = 0; i < costs.size(); i++) {
-		costs[i][clusterIndex] = twoPairsCost(pairsPD[i], lastPairCluster[clusterIndex]);
+		distFloat cost = pointToPair(pairsPD[i], lastPairCluster[clusterIndex]);
+		if (cost.minP < costs[i][clusterIndex].minP)
+			costs[i][clusterIndex].minP = cost.minP;
+		if (cost.minD < costs[i][clusterIndex].minD)
+			costs[i][clusterIndex].minD = cost.minD;
+		if (costs[i][clusterIndex].minP + costs[i][clusterIndex].minD < total[i].minTotal) {
+			total[i].minTotal = costs[i][clusterIndex].minP + costs[i][clusterIndex].minD;
+			total[i].clusterIndex = clusterIndex;
+		}
 	}
 }
 
+// Obtem os K clusters, segundo a heuristica
 void clusterCalculator(vector<vector<point2D>> &clusters, vector<vector<point2D>> &lastPairCluster, vector<vector<point2D>> &pairsPD, int k, int c) {
 	clusters.push_back(pairsPD[c]);
+	lastPairCluster.push_back(pairsPD[c]);
 	pairsPD.erase(pairsPD.begin() + c);
 
 	vector<float> minDist;
@@ -191,7 +217,7 @@ void clusterCalculator(vector<vector<point2D>> &clusters, vector<vector<point2D>
 		float maxDist = minDist[0];
 		int iMax = 0;
 
-		for (int j = 1; j < pairsPD.size(); j++) {
+		for (int j = 0; j < pairsPD.size(); j++) {
 			if (minDist[j] > maxDist) {
 				maxDist = minDist[j];
 				iMax = j;
@@ -270,14 +296,14 @@ int main()
 		exit(1);
 	}
 	else {
-		cout << "File opened" << endl;
+		//cout << "File opened" << endl;
 	}
 
 	// coletando a dimencao do grafo
 	while (getline(inFile, line)) {
 		if (line.find(searchD) != string::npos) {
 			DIM = line.substr(11);
-			cout << searchD << DIM << endl;
+			//cout << searchD << DIM << endl;
 			intDIM = std::stoi(DIM);
 			break;
 		}
@@ -308,6 +334,8 @@ int main()
 
 	vector<double> allCosts;
 
+	int x = 0;
+
 	for (int k = 2; k < intDIM / 2; k++) {
 
 		//cout << "K: " << k << endl << endl;
@@ -324,7 +352,7 @@ int main()
 			// clusters
 			vector<vector<point2D>> clusters;
 
-			// vetor que guarda os centroides dos clusters respectivamente
+			// vetor que guarda o ultimo par inserido em um cluster
 			vector<vector<point2D>> lastPairCluster;
 
 			// associacao de cada ponto com seu respectivo par (pickup, delivery), que passam a ser considerados como grafos
@@ -335,13 +363,24 @@ int main()
 
 			clusterCalculator(clusters, lastPairCluster, pairsPD, k, c);
 
-			// 
-			vector<vector<float>> pairsPDCosts;
+			// matriz de custo dos pares em relacao aos clusters
+			vector<vector<distFloat>> pairsPDCosts;
 			pairsPDCosts.resize(pairsPD.size());
+
+			vector<distTotal> minDistTotal;
+			minDistTotal.resize(pairsPD.size());
+			for (int i = 0; i < pairsPD.size(); i++) 
+				minDistTotal[i].minTotal = std::numeric_limits<float>::infinity();
 
 			for (int i = 0; i < pairsPD.size(); i++) {
 				for (int j = 0; j < lastPairCluster.size(); j++) {
-					pairsPDCosts[i].push_back(twoPairsCost(pairsPD[i], lastPairCluster[j]));
+					//pointToPair(pairsPD[i], pairsPDCosts[i][j], lastPairCluster[j]);
+					pairsPDCosts[i].push_back(pointToPair(pairsPD[i], lastPairCluster[j]));
+					float cost = pairsPDCosts[i][j].minP + pairsPDCosts[i][j].minD;
+					if (cost < minDistTotal[i].minTotal) {
+						minDistTotal[i].minTotal = cost;
+						minDistTotal[i].clusterIndex = j;
+					}
 				}
 			}
 
@@ -349,39 +388,22 @@ int main()
 
 				int pairIndex, clusterIndex;
 
-				lowestCostMatrix(pairsPDCosts, pairIndex, clusterIndex);
+				lowestCostMatrix(minDistTotal, pairIndex, clusterIndex);
 
 				insertBestPosition(clusters[clusterIndex], pairsPD[pairIndex], lastPairCluster[clusterIndex]);
 
 				pairsPD.erase(pairsPD.begin() + pairIndex);
 				pairsPDCosts.erase(pairsPDCosts.begin() + pairIndex);
+				minDistTotal.erase(minDistTotal.begin() + pairIndex);
 
-				updatePairsCosts(pairsPD, pairsPDCosts, lastPairCluster, clusterIndex);
+				updatePairsCosts(pairsPD, pairsPDCosts, lastPairCluster, minDistTotal, clusterIndex);
 			}
-
-			double cost = returnCycleCost(clusters);
-
-			/*
-			if (cost < bestCaseCost) {
-				bestCaseClusters = clusters;
-				bestCaseCost = cost;
-			} */
-
-			allCosts.push_back(cost);
+			allCosts.push_back(returnCycleCost(clusters));
+			cout << x++ << endl;
 		}
 
 		//cout << endl;
 	}
-
-	/*
-	for (int i = 0; i < bestCaseClusters.size(); i++) {
-		for (int j = 0; j < bestCaseClusters[i].size(); j++) {
-			cout << returnID(bestCaseClusters[i][j]) << ">";
-		}
-		cout << endl << endl;
-	} */
-
-	
 
 	cout  << "Custo: " << *min_element(allCosts.begin(), allCosts.end()) << endl;
 
