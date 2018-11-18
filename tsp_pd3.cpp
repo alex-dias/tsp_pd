@@ -10,6 +10,7 @@
 #include <time.h>
 #include <algorithm>
 #include <stdlib.h>
+#include <Windows.h>
 
 using namespace std;
 
@@ -27,39 +28,6 @@ float pointDist(point2D point1, point2D point2) {
 
 int returnID(point2D point1) {
 	return point1.id;
-};
-
-// funcao para manipular e retorna o vetor que sera inserido
-// a sequencia dos valores no vetor representa a ordem dos pontos de um grafo
-// begin e end sao necessarios para simular a situacao de uma lista circular
-vector<point2D> createNewVector(vector<point2D>::iterator it1, vector<point2D>::iterator itv1, vector<point2D>::iterator begin, vector<point2D>::iterator end, bool isDirect) {
-
-	vector<point2D> newVector;
-
-	// se a ligacao eh direta o novo vetor eh criado a partir it1, seguidos de seus vizinhos a ESQUERDA ateh itv1
-	if (isDirect) {
-		while (it1 != itv1) {
-			newVector.push_back(*it1);
-			if (it1 == begin)
-				it1 = end;
-			it1--;
-		}
-		newVector.push_back(*itv1);
-	}
-	// se a ligacao eh cruzada o novo vetor eh criado a partir itv1, seguidos de seus vizinhos a DIREITA ateh it1
-	else {
-		while (itv1 != it1) {
-			newVector.push_back(*itv1);
-			if (itv1 == end - 1) {
-				itv1 = begin;
-				break;
-			}
-			itv1++;
-		}
-		newVector.push_back(*it1);
-	}
-
-	return newVector;
 };
 
 void printpairsPD(vector<vector<point2D>> pairsPD) {
@@ -263,152 +231,183 @@ double returnCycleCost(vector<vector<point2D>> cycle) {
 
 int main()
 {
-	// variavel de contagem de tempo
-	clock_t tStart = clock();
+	ofstream myfile;
+	myfile.open("tests.csv");
 
-	// variaveis responsaveis pela leitura do arquivo e atribuicao das variaveis
-	ifstream inFile;
-	string line;
-	string searchD = "DIMENSION: ";
-	string searchN = "NODE_COORD_SECTION";
-	string DIM;
-	string NOD;
-	int intDIM = 0;
-	istringstream iss;
+	myfile << "NAME|DIMENSION|RESULT|CLUSTERS|TIME\n";
 
-	// vetor dinamico de pontos, usada para receber os pontos sem seus respectivos pares
-	vector<point2D> node;
+	WIN32_FIND_DATA data;
+	HANDLE hFind = FindFirstFile("testInst\\*", &data);      // DIRECTORY
 
-	// estrutura dinamica de vetor de vetores
-	// representa uma colecao de grafos, onde cada vetor eh um grafo
-	vector<vector<point2D>> pairsPD;
+	FindNextFile(hFind, &data);
+	FindNextFile(hFind, &data);
 
-	// clusters
-	vector<vector<point2D>> clusters;
+	int inst = 0;
 
-	// vetor que guarda os centroides dos clusters respectivamente
-	vector<vector<point2D>> lastPairCluster;
+	if (hFind != INVALID_HANDLE_VALUE) {
+		do {
 
-	// leitura do arquivo
-	inFile.open("rg-032-q-2x2-W0.4.0001.ccpdp");
-	if (!inFile) {
-		cout << "Unable to open file" << endl;
-		exit(1);
-	}
-	else {
-		//cout << "File opened" << endl;
-	}
+			// variaveis responsaveis pela leitura do arquivo e atribuicao das variaveis
+			ifstream inFile;
+			string line;
+			string searchD = "DIMENSION: ";
+			string searchN = "NODE_COORD_SECTION";
+			string DIM;
+			string NOD;
+			int intDIM = 0;
+			istringstream iss;
 
-	// coletando a dimencao do grafo
-	while (getline(inFile, line)) {
-		if (line.find(searchD) != string::npos) {
-			DIM = line.substr(11);
-			//cout << searchD << DIM << endl;
-			intDIM = std::stoi(DIM);
-			break;
-		}
-	}
-
-	// com o valor da dimencao eh possivel saber que o tamanho da colecao de grafos (vetor de vetores)
-	pairsPD.resize(intDIM / 2);
-
-	// alimentacao da estrutura de pontos com os valores do arquivo
-	while (getline(inFile, line)) {
-		if (line.find(searchN) != string::npos) {
-			for (int i = 0; i < intDIM; i++) {
-				getline(inFile, line);
-				iss.str(line);
-
-				point2D point;
-				iss >> point.id >> point.x >> point.y; // iss retira os espacos entre os valores
-
-				node.push_back(point);
-
-				iss.clear();
-			}
-		}
-	}
-
-	vector<vector<point2D>> bestCaseClusters;
-	double bestCaseCost = std::numeric_limits<double>::infinity();
-
-	vector<double> allCosts;
-
-	int x = 0;
-
-	for (int k = 2; k < intDIM / 2; k++) {
-
-		//cout << "K: " << k << endl << endl;
-
-		for (int c = 0; c < intDIM / 2; c++) {
-
-			//cout << "C: " << c << endl;
+			// vetor dinamico de pontos, usada para receber os pontos sem seus respectivos pares
+			vector<point2D> node;
 
 			// estrutura dinamica de vetor de vetores
 			// representa uma colecao de grafos, onde cada vetor eh um grafo
 			vector<vector<point2D>> pairsPD;
-			pairsPD.resize(intDIM / 2);
 
 			// clusters
 			vector<vector<point2D>> clusters;
 
-			// vetor que guarda o ultimo par inserido em um cluster
+			// vetor que guarda os centroides dos clusters respectivamente
 			vector<vector<point2D>> lastPairCluster;
 
-			// associacao de cada ponto com seu respectivo par (pickup, delivery), que passam a ser considerados como grafos
-			for (int i = 0; i < intDIM / 2; i++) {
-				pairsPD[i].push_back(node[i]);
-				pairsPD[i].push_back(node[i + intDIM / 2]);
+			// leitura do arquivo
+			inFile.open("testInst\\" + string(data.cFileName));
+			if (!inFile) {
+				cout << "Unable to open file" << endl;
+				exit(1);
+			}
+			else {
+				//cout << "File opened" << endl;
 			}
 
-			clusterCalculator(clusters, lastPairCluster, pairsPD, k, c);
+			// coletando a dimencao do grafo
+			while (getline(inFile, line)) {
+				if (line.find(searchD) != string::npos) {
+					DIM = line.substr(11);
+					//cout << searchD << DIM << endl;
+					intDIM = std::stoi(DIM);
+					break;
+				}
+			}
 
-			// matriz de custo dos pares em relacao aos clusters
-			vector<vector<distFloat>> pairsPDCosts;
-			pairsPDCosts.resize(pairsPD.size());
+			// com o valor da dimencao eh possivel saber que o tamanho da colecao de grafos (vetor de vetores)
+			pairsPD.resize(intDIM / 2);
 
-			vector<distTotal> minDistTotal;
-			minDistTotal.resize(pairsPD.size());
-			for (int i = 0; i < pairsPD.size(); i++) 
-				minDistTotal[i].minTotal = std::numeric_limits<float>::infinity();
+			// alimentacao da estrutura de pontos com os valores do arquivo
+			while (getline(inFile, line)) {
+				if (line.find(searchN) != string::npos) {
+					for (int i = 0; i < intDIM; i++) {
+						getline(inFile, line);
+						iss.str(line);
 
-			for (int i = 0; i < pairsPD.size(); i++) {
-				for (int j = 0; j < lastPairCluster.size(); j++) {
-					//pointToPair(pairsPD[i], pairsPDCosts[i][j], lastPairCluster[j]);
-					pairsPDCosts[i].push_back(pointToPair(pairsPD[i], lastPairCluster[j]));
-					float cost = pairsPDCosts[i][j].minP + pairsPDCosts[i][j].minD;
-					if (cost < minDistTotal[i].minTotal) {
-						minDistTotal[i].minTotal = cost;
-						minDistTotal[i].clusterIndex = j;
+						point2D point;
+						iss >> point.id >> point.x >> point.y; // iss retira os espacos entre os valores
+
+						node.push_back(point);
+
+						iss.clear();
 					}
 				}
 			}
 
-			while (pairsPD.size() > 0) {
+			// variavel de contagem de tempo
+			clock_t tStart = clock();
 
-				int pairIndex, clusterIndex;
+			vector<vector<point2D>> bestCaseClusters;
+			double bestCaseCost = std::numeric_limits<double>::infinity();
 
-				lowestCostMatrix(minDistTotal, pairIndex, clusterIndex);
+			int nClusters;
 
-				insertBestPosition(clusters[clusterIndex], pairsPD[pairIndex], lastPairCluster[clusterIndex]);
+			int x = 0;
 
-				pairsPD.erase(pairsPD.begin() + pairIndex);
-				pairsPDCosts.erase(pairsPDCosts.begin() + pairIndex);
-				minDistTotal.erase(minDistTotal.begin() + pairIndex);
+			for (int k = 2; k < intDIM / 2; k++) {
 
-				updatePairsCosts(pairsPD, pairsPDCosts, lastPairCluster, minDistTotal, clusterIndex);
+				//cout << "K: " << k << endl << endl;
+
+				for (int c = 0; c < intDIM / 2; c++) {
+
+					//cout << "C: " << c << endl;
+
+					// estrutura dinamica de vetor de vetores
+					// representa uma colecao de grafos, onde cada vetor eh um grafo
+					vector<vector<point2D>> pairsPD;
+					pairsPD.resize(intDIM / 2);
+
+					// clusters
+					vector<vector<point2D>> clusters;
+
+					// vetor que guarda o ultimo par inserido em um cluster
+					vector<vector<point2D>> lastPairCluster;
+
+					// associacao de cada ponto com seu respectivo par (pickup, delivery), que passam a ser considerados como grafos
+					for (int i = 0; i < intDIM / 2; i++) {
+						pairsPD[i].push_back(node[i]);
+						pairsPD[i].push_back(node[i + intDIM / 2]);
+					}
+
+					clusterCalculator(clusters, lastPairCluster, pairsPD, k, c);
+
+					// matriz de custo dos pares em relacao aos clusters
+					vector<vector<distFloat>> pairsPDCosts;
+					pairsPDCosts.resize(pairsPD.size());
+
+					vector<distTotal> minDistTotal;
+					minDistTotal.resize(pairsPD.size());
+					for (int i = 0; i < pairsPD.size(); i++)
+						minDistTotal[i].minTotal = std::numeric_limits<float>::infinity();
+
+					for (int i = 0; i < pairsPD.size(); i++) {
+						for (int j = 0; j < lastPairCluster.size(); j++) {
+							//pointToPair(pairsPD[i], pairsPDCosts[i][j], lastPairCluster[j]);
+							pairsPDCosts[i].push_back(pointToPair(pairsPD[i], lastPairCluster[j]));
+							float cost = pairsPDCosts[i][j].minP + pairsPDCosts[i][j].minD;
+							if (cost < minDistTotal[i].minTotal) {
+								minDistTotal[i].minTotal = cost;
+								minDistTotal[i].clusterIndex = j;
+							}
+						}
+					}
+
+					while (pairsPD.size() > 0) {
+
+						int pairIndex, clusterIndex;
+
+						lowestCostMatrix(minDistTotal, pairIndex, clusterIndex);
+
+						insertBestPosition(clusters[clusterIndex], pairsPD[pairIndex], lastPairCluster[clusterIndex]);
+
+						pairsPD.erase(pairsPD.begin() + pairIndex);
+						pairsPDCosts.erase(pairsPDCosts.begin() + pairIndex);
+						minDistTotal.erase(minDistTotal.begin() + pairIndex);
+
+						updatePairsCosts(pairsPD, pairsPDCosts, lastPairCluster, minDistTotal, clusterIndex);
+					}
+
+					double caseCost = returnCycleCost(clusters);
+
+					if (caseCost < bestCaseCost) {
+						bestCaseCost = returnCycleCost(clusters);
+						nClusters = k;
+					}
+					//cout << x++ << endl;
+				}
+
+				//cout << endl;
 			}
-			allCosts.push_back(returnCycleCost(clusters));
-			cout << x++ << endl;
-		}
 
-		//cout << endl;
+			cout << "Custo: " << fixed << bestCaseCost << endl;
+
+			cout << inst << endl;
+
+			inst++;
+
+			// print do tempo de execucao
+			cout  << "Time taken: " << (double)(clock() - tStart) / CLOCKS_PER_SEC << endl << endl;
+
+			myfile << string(data.cFileName) << "|" << intDIM / 2 << "|" << fixed << bestCaseCost << "|" << nClusters << "|" << ("%.5fs\n", (double)(clock() - tStart) / CLOCKS_PER_SEC) << "\n";
+
+			inFile.close();
+		} while (FindNextFile(hFind, &data));
+		FindClose(hFind);
 	}
-
-	cout  << "Custo: " << *min_element(allCosts.begin(), allCosts.end()) << endl;
-
-	// print do tempo de execucao
-	cout << endl << "Time taken: " << (double)(clock() - tStart) / CLOCKS_PER_SEC << endl;
-
-	inFile.close();
 }
