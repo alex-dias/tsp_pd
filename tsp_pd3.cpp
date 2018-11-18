@@ -8,9 +8,7 @@
 #include <vector>	
 #include <math.h>
 #include <time.h>
-#include <algorithm>
-#include <stdlib.h>
-#include <Windows.h>
+#include <windows.h>
 
 using namespace std;
 
@@ -26,188 +24,74 @@ float pointDist(point2D point1, point2D point2) {
 	return sqrt(pow((point1.x - point2.x), 2) + pow((point1.y - point2.y), 2));
 };
 
+void pairCostPrint(point2D point1, point2D point2, point2D point3, point2D point4) {
+	float case1 = pointDist(point1, point3) + pointDist(point2, point4)
+		- pointDist(point1, point2) - pointDist(point3, point4); // sem cruzar
+	float case2 = pointDist(point1, point4) + pointDist(point2, point3)
+		- pointDist(point1, point2) - pointDist(point3, point4); // cruzar
+
+	cout << "Case 1: " << case1 << " Case 2: " << case2 << endl;
+};
+
+// case1 eh a comparacao direta e case 2 eh a comparacao cruzada
+float pairCost(point2D point1, point2D point2, point2D point3, point2D point4, bool &isDirect) {
+	float case1 = pointDist(point1, point3) + pointDist(point2, point4)
+		- pointDist(point1, point2) - pointDist(point3, point4); // sem cruzar
+	float case2 = pointDist(point1, point4) + pointDist(point2, point3)
+		- pointDist(point1, point2) - pointDist(point3, point4); // cruzar
+
+	// retorna o menor caso e muda o valor de isDirect
+	if (case1 < case2) {
+		isDirect = 1;
+		return case1;
+	}
+	else {
+		isDirect = 0;
+		return case2;
+	}
+};
+
 int returnID(point2D point1) {
 	return point1.id;
 };
 
-void printpairsPD(vector<vector<point2D>> pairsPD) {
-	for (int i = 0; i < pairsPD.size(); i++) {
-		for (std::vector<point2D>::iterator it = pairsPD[i].begin(); it != pairsPD[i].end(); ++it) {
-			cout << returnID(*it) << '>';
+// funcao para manipular e retorna o vetor que sera inserido
+// a sequencia dos valores no vetor representa a ordem dos pontos de um grafo
+// begin e end sao necessarios para simular a situacao de uma lista circular
+vector<point2D> createNewVector(vector<point2D>::iterator it1, vector<point2D>::iterator itv1, vector<point2D>::iterator begin, vector<point2D>::iterator end, bool isDirect) {
+
+	vector<point2D> newVector;
+
+	// se a ligacao eh direta o novo vetor eh criado a partir it1, seguidos de seus vizinhos a ESQUERDA ateh itv1
+	if (isDirect) {
+		while (it1 != itv1) {
+			newVector.push_back(*it1);
+			if (it1 == begin)
+				it1 = end;
+			it1--;
 		}
-		cout << endl;
+		newVector.push_back(*itv1);
 	}
-}
-
-// Dado um clusters e um ciclo trivial, essa funcao verifica qual a melhor forma e posicao de inserir esse ciclo trivial no cluster
-// Alem disso, tambem atualiza o lastPairCluster com o ciclo recem inserido
-void insertBestPosition(vector<point2D>& cluster, vector<point2D> trivial, vector<point2D> lastPairCluster) {
-
-	float costP, costD, costPD, costPD2, 
-		lowP = std::numeric_limits<float>::infinity(), 
-		lowD = std::numeric_limits<float>::infinity(), 
-		lowPD = std::numeric_limits<float>::infinity(),
-		lowPD2 = std::numeric_limits<float>::infinity();
-	int vizinho, insertP, insertD, insertPD, insertPD2;
-
-	for (int i = 0; i < cluster.size(); i++) {
-
-		if (i == cluster.size() - 1) {
-			vizinho = 0;
-		}
-		else {
-			vizinho = i;
-			vizinho++;
-		}
-
-		costP = pointDist(trivial[0], cluster[i]) + pointDist(trivial[0], cluster[vizinho]) - pointDist(cluster[i], cluster[vizinho]);
-		costD = pointDist(trivial[1], cluster[i]) + pointDist(trivial[1], cluster[vizinho]) - pointDist(cluster[i], cluster[vizinho]);
-		costPD = pointDist(trivial[0], cluster[i]) + pointDist(trivial[1], cluster[vizinho]) + pointDist(trivial[0], trivial[1]) - pointDist(cluster[i], cluster[vizinho]);
-		costPD2 = pointDist(trivial[0], cluster[vizinho]) + pointDist(trivial[1], cluster[i]) + pointDist(trivial[0], trivial[1]) - pointDist(cluster[i], cluster[vizinho]);
-
-		if (costP < lowP) {
-			lowP = costP;
-			insertP = i;
-		}
-		if (costD < lowD) {
-			lowD = costD;
-			insertD = i;
-		}
-		if (costPD < lowPD) {
-			lowPD = costPD;
-			insertPD = i;
-		}
-		if (costPD2 < lowPD2) {
-			lowPD2 = costPD2;
-			insertPD2 = i;
-		}
-	}
-
-	if (lowPD < lowP + lowD || insertP == insertD) {
-		vector<point2D> vector2insert;
-		vector2insert.push_back(trivial[0]);
-		vector2insert.push_back(trivial[1]);
-		cluster.insert(cluster.begin() + insertPD + 1, vector2insert.begin(), vector2insert.end());
-		lastPairCluster = vector2insert;
-	}
+	// se a ligacao eh cruzada o novo vetor eh criado a partir itv1, seguidos de seus vizinhos a DIREITA ateh it1
 	else {
-		if (lowPD2 < lowP + lowD) {
-			vector<point2D> vector2insert;
-			vector2insert.push_back(trivial[1]);
-			vector2insert.push_back(trivial[0]);
-			cluster.insert(cluster.begin() + insertPD2 + 1, vector2insert.begin(), vector2insert.end());
-			lastPairCluster = vector2insert;
-		}
-		else {
-			if (insertP < insertD) {
-				cluster.insert(cluster.begin() + insertP + 1, trivial[0]);
-				cluster.insert(cluster.begin() + insertD + 2, trivial[1]);
-				lastPairCluster[0] = trivial[0];
-				lastPairCluster[1] = trivial[1];
+		while (itv1 != it1) {
+			newVector.push_back(*itv1);
+			if (itv1 == end - 1) {
+				itv1 = begin;
+				if (itv1 == it1)
+					break;
+				newVector.push_back(*itv1);
 			}
-			else {
-				cluster.insert(cluster.begin() + insertD + 1, trivial[1]);
-				cluster.insert(cluster.begin() + insertP + 2, trivial[0]);
-				lastPairCluster[1] = trivial[1];
-				lastPairCluster[0] = trivial[0];
-			}
+			itv1++;
 		}
-	}
-}
-
-// Percorre a matriz de custo dos pares nao indexados e encontra o menor custo
-void lowestCostMatrix(vector<distTotal> costs, int &i, int &j) {
-	float lowestCost = std::numeric_limits<float>::infinity();
-
-	for (int k = 0; k < costs.size(); k++) {
-		if (costs[k].minTotal < lowestCost) {
-			lowestCost = costs[k].minTotal;
-			i = k;
-			j = costs[k].clusterIndex;
-		}
-	}
-}
-
-// Retorna a distancia entre dois pares, que a menor distancia entre os quatro pontos que compoem os dois pares
-float twoPairsCost(vector<point2D> pair1, vector<point2D> pair2) {
-	vector<float> costs; // costPD, costDP, costPP, costDD;
-
-	costs.push_back(pointDist(pair1[0], pair2[1])); // costPD
-	costs.push_back(pointDist(pair1[1], pair2[0])); // costDP
-	costs.push_back(pointDist(pair1[0], pair2[0])); // costPP
-	costs.push_back(pointDist(pair1[1], pair2[1])); // costDD
-
-	return *min_element(std::begin(costs), std::end(costs));
-}
-
-distFloat pointToPair(vector<point2D> pairsPD, vector<point2D> lastPairCluster) {
-	distFloat dist;
-	dist.minP = pointDist(pairsPD[0], lastPairCluster[0]); //PP
-	float cost = pointDist(pairsPD[0], lastPairCluster[1]); //PD
-	if (cost < dist.minP)
-		dist.minP = cost;
-	dist.minD = pointDist(pairsPD[1], lastPairCluster[0]); //DP
-	cost = pointDist(pairsPD[1], lastPairCluster[1]); //DD
-	if (cost < dist.minD)
-		dist.minD = cost;
-	
-	return dist;
-}
-
-// Atualiza a distancia de todos os pares nao indexados em relacao a um cluster
-void updatePairsCosts(vector<vector<point2D>> &pairsPD, vector<vector<distFloat>> &costs, vector<vector<point2D>> &lastPairCluster, vector<distTotal> &total, int clusterIndex) {
-	for (int i = 0; i < costs.size(); i++) {
-		distFloat cost = pointToPair(pairsPD[i], lastPairCluster[clusterIndex]);
-		if (cost.minP < costs[i][clusterIndex].minP)
-			costs[i][clusterIndex].minP = cost.minP;
-		if (cost.minD < costs[i][clusterIndex].minD)
-			costs[i][clusterIndex].minD = cost.minD;
-		if (costs[i][clusterIndex].minP + costs[i][clusterIndex].minD < total[i].minTotal) {
-			total[i].minTotal = costs[i][clusterIndex].minP + costs[i][clusterIndex].minD;
-			total[i].clusterIndex = clusterIndex;
-		}
-	}
-}
-
-// Obtem os K clusters, segundo a heuristica
-void clusterCalculator(vector<vector<point2D>> &clusters, vector<vector<point2D>> &lastPairCluster, vector<vector<point2D>> &pairsPD, int k, int c) {
-	clusters.push_back(pairsPD[c]);
-	lastPairCluster.push_back(pairsPD[c]);
-	pairsPD.erase(pairsPD.begin() + c);
-
-	vector<float> minDist;
-
-	for (int i = 0; i < pairsPD.size(); i++) {
-		minDist.push_back(twoPairsCost(clusters[0], pairsPD[i]));
+		newVector.push_back(*it1);
 	}
 
-	for (int i = 1; i < k; i++) {
-		float maxDist = minDist[0];
-		int iMax = 0;
-
-		for (int j = 0; j < pairsPD.size(); j++) {
-			if (minDist[j] > maxDist) {
-				maxDist = minDist[j];
-				iMax = j;
-			}
-		}
-
-		clusters.push_back(*(pairsPD.begin() + iMax));
-		lastPairCluster.push_back(*(pairsPD.begin() + iMax));
-		pairsPD.erase(pairsPD.begin() + iMax);
-		minDist.erase(minDist.begin() + iMax);
-
-		for (int j = 0; j < pairsPD.size(); j++) {
-			float newCost = twoPairsCost(*(clusters.end() - 1), pairsPD[j]);
-			if (newCost < minDist[j])
-				minDist[j] = newCost;
-		}
-	}
-}
+	return newVector;
+};
 
 double returnCycleCost(vector<vector<point2D>> cycle) {
 	double cost = 0;
-	int x = 0;
 
 	for (int i = 0; i < cycle.size(); i++) {
 		for (std::vector<point2D>::iterator it = cycle[i].begin(); it != cycle[i].end(); ++it) {
@@ -220,29 +104,36 @@ double returnCycleCost(vector<vector<point2D>> cycle) {
 				vizinho++;
 			}
 			cost += pointDist(*it, *vizinho);
-			x++;
 		}
 	}
 
-	//cout << "Nodes: " << x << endl;
-
 	return cost;
+};
+
+void printCycle(vector<vector<point2D>> cycle) {
+	int x = 0;
+	for (int i = 0; i < cycle.size(); i++) {
+		for (std::vector<point2D>::iterator it = cycle[i].begin(); it != cycle[i].end(); ++it) {
+			cout << returnID(*it) << '>';
+			x++;
+		}
+		cout << endl;
+	}
+	cout << endl << x << endl;
 }
 
-int main()
-{
+int main() {
+
 	ofstream myfile;
 	myfile.open("tests.csv");
 
-	myfile << "NAME|DIMENSION|RESULT|CLUSTERS|TIME\n";
+	myfile << "NAME|DIMENSION|RESULT|TIME\n";
 
 	WIN32_FIND_DATA data;
 	HANDLE hFind = FindFirstFile("testInst\\*", &data);      // DIRECTORY
 
 	FindNextFile(hFind, &data);
 	FindNextFile(hFind, &data);
-
-	int inst = 0;
 
 	if (hFind != INVALID_HANDLE_VALUE) {
 		do {
@@ -262,13 +153,7 @@ int main()
 
 			// estrutura dinamica de vetor de vetores
 			// representa uma colecao de grafos, onde cada vetor eh um grafo
-			vector<vector<point2D>> pairsPD;
-
-			// clusters
-			vector<vector<point2D>> clusters;
-
-			// vetor que guarda os centroides dos clusters respectivamente
-			vector<vector<point2D>> lastPairCluster;
+			vector<vector<point2D>> cycle;
 
 			// leitura do arquivo
 			inFile.open("testInst\\" + string(data.cFileName));
@@ -291,7 +176,7 @@ int main()
 			}
 
 			// com o valor da dimencao eh possivel saber que o tamanho da colecao de grafos (vetor de vetores)
-			pairsPD.resize(intDIM / 2);
+			cycle.resize(intDIM / 2);
 
 			// alimentacao da estrutura de pontos com os valores do arquivo
 			while (getline(inFile, line)) {
@@ -310,103 +195,138 @@ int main()
 				}
 			}
 
+			// associacao de cada ponto com seu respectivo par (pickup, delivery), que passam a ser considerados como grafos
+			for (int i = 0; i < intDIM / 2; i++) {
+				cycle[i].push_back(node[i]);
+				cycle[i].push_back(node[i + intDIM / 2]);
+			}
+
+			vector<vector<point2D>> bestCase = cycle;
+			double bestCaseCost = returnCycleCost(bestCase);
+
 			// variavel de contagem de tempo
 			clock_t tStart = clock();
 
-			vector<vector<point2D>> bestCaseClusters;
-			double bestCaseCost = std::numeric_limits<double>::infinity();
+			// aqui comeca a manipulacao em si
+			// o objetivo eh tornar todos os grafos em um soh, por isso a condicao de parada eh quando a colecao de grafos tiver soh um grafo
+			while (cycle.size() > 1) {
 
-			int nClusters;
+				/*
+				   vizinho1 e vizinho 2 sao os proximos pontos em relacao aos iteradores it1 e it2 respectivamente
+				   lowest1 e lowest2 guardam os dois iteradores (it1, it2) respectivos a comparacao de menor custo
+				   lowest2V eh o proximo ponto em relacao a lowest2, lowest1V nao eh salvo pq o vetor resultante sempre eh inserido a direita de lowest1, indenpendente de lowest1V
+				   eraseP eh uma variavel auxiliar para remover um vetor da colecao de vetores
+				   lowestCost guarda o menor custo encontrado depois das comparacoes, por isso eh iniciado com o valor 'infinito'
+				   cost armazena o custo da comparacao
+				   isDirect armazena se o custo retornado foi em relacao a um comparacao cruzada ou nao, iDirectLow armazena a direcao da comparacao de menor custo
+				   insertI eh uma variavel auxiliar que guardar a posicao do vetor no qual sera realizado a insercao
+				*/
+				vector<point2D>::iterator vizinho1, vizinho2, lowest1, lowest2, lowest2V, lowBegin, lowEnd;
+				vector<vector<point2D>>::iterator eraseP;
+				float lowestCost = std::numeric_limits<float>::infinity();
+				float cost;
+				bool isDirect, isDirectLow;
+				int insertI;
+				double cycleCost;
 
-			int x = 0;
+				for (int i = 0; i < cycle.size() - 1; ++i) // - 1 pq o ultimo grafo nao compara com ninguem
+				{
+					//cout << "------ EXTERNO " << i + 1 << " -------" << endl;
+					for (std::vector<point2D>::iterator it1 = cycle[i].begin(); it1 != cycle[i].end(); ++it1) { // it1 eh um ponteiro que percorre o vetor de vetores
+						// eh preciso tratar caso it1 seja a ultima posicao do vetor, de modo que seu vizinho devera ser a primeira posicao do vetor
+						if (it1 == cycle[i].end() - 1) { // -1 pq a funcao end() retornar a posicao seguinte a ultima posicao do vetor
+							vizinho1 = cycle[i].begin();
+						}
+						else {
+							vizinho1 = it1;
+							vizinho1++;
+						}
+						for (int j = i + 1; j < cycle.size(); ++j) { // j sempre diminui em relacao a i, para evitar comparacoes ja realizadas
+							//cout << "------ INTERNO " << j << " -------" << endl;
+							for (std::vector<point2D>::iterator it2 = cycle[j].begin(); it2 != cycle[j].end(); ++it2) { // it2 eh um ponteiro que percorre cada vetor da colecao
+								vizinho2 = it2;
+								// mesmo caso de it1
+								if (vizinho2 == cycle[j].end() - 1) {
+									vizinho2 = cycle[j].begin();
+								}
+								else {
+									vizinho2++;
+								}
+								// calculo do custo entre os pares de pontos
+								cost = pairCost(*it1, *vizinho1, *it2, *vizinho2, isDirect);
 
-			for (int k = 2; k < intDIM / 2; k++) {
+								// prints para auxiliar o debug
+								//cout << returnID(*it1) << " - " << returnID(*vizinho1) << " X " << returnID(*it2) << " - " << returnID(*vizinho2) << endl;
+								//pairCostPrint(*it1, *vizinho1, *it2, *vizinho2);
+								//cout << endl << endl;
 
-				//cout << "K: " << k << endl << endl;
-
-				for (int c = 0; c < intDIM / 2; c++) {
-
-					//cout << "C: " << c << endl;
-
-					// estrutura dinamica de vetor de vetores
-					// representa uma colecao de grafos, onde cada vetor eh um grafo
-					vector<vector<point2D>> pairsPD;
-					pairsPD.resize(intDIM / 2);
-
-					// clusters
-					vector<vector<point2D>> clusters;
-
-					// vetor que guarda o ultimo par inserido em um cluster
-					vector<vector<point2D>> lastPairCluster;
-
-					// associacao de cada ponto com seu respectivo par (pickup, delivery), que passam a ser considerados como grafos
-					for (int i = 0; i < intDIM / 2; i++) {
-						pairsPD[i].push_back(node[i]);
-						pairsPD[i].push_back(node[i + intDIM / 2]);
-					}
-
-					clusterCalculator(clusters, lastPairCluster, pairsPD, k, c);
-
-					// matriz de custo dos pares em relacao aos clusters
-					vector<vector<distFloat>> pairsPDCosts;
-					pairsPDCosts.resize(pairsPD.size());
-
-					vector<distTotal> minDistTotal;
-					minDistTotal.resize(pairsPD.size());
-					for (int i = 0; i < pairsPD.size(); i++)
-						minDistTotal[i].minTotal = std::numeric_limits<float>::infinity();
-
-					for (int i = 0; i < pairsPD.size(); i++) {
-						for (int j = 0; j < lastPairCluster.size(); j++) {
-							//pointToPair(pairsPD[i], pairsPDCosts[i][j], lastPairCluster[j]);
-							pairsPDCosts[i].push_back(pointToPair(pairsPD[i], lastPairCluster[j]));
-							float cost = pairsPDCosts[i][j].minP + pairsPDCosts[i][j].minD;
-							if (cost < minDistTotal[i].minTotal) {
-								minDistTotal[i].minTotal = cost;
-								minDistTotal[i].clusterIndex = j;
+								// atribuicoes caso o custo encontrado seja o menor ateh agora
+								if (cost < lowestCost) {
+									lowestCost = cost;
+									lowest1 = it1;
+									lowest2 = it2;
+									lowest2V = vizinho2;
+									insertI = i;
+									isDirectLow = isDirect;
+									lowBegin = cycle[j].begin();
+									lowEnd = cycle[j].end();
+									eraseP = cycle.begin() + j;
+								}
 							}
 						}
 					}
-
-					while (pairsPD.size() > 0) {
-
-						int pairIndex, clusterIndex;
-
-						lowestCostMatrix(minDistTotal, pairIndex, clusterIndex);
-
-						insertBestPosition(clusters[clusterIndex], pairsPD[pairIndex], lastPairCluster[clusterIndex]);
-
-						pairsPD.erase(pairsPD.begin() + pairIndex);
-						pairsPDCosts.erase(pairsPDCosts.begin() + pairIndex);
-						minDistTotal.erase(minDistTotal.begin() + pairIndex);
-
-						updatePairsCosts(pairsPD, pairsPDCosts, lastPairCluster, minDistTotal, clusterIndex);
-					}
-
-					double caseCost = returnCycleCost(clusters);
-
-					if (caseCost < bestCaseCost) {
-						bestCaseCost = returnCycleCost(clusters);
-						nClusters = k;
-					}
-					//cout << x++ << endl;
 				}
 
-				//cout << endl;
+				// prints para auxiliar o debug
+				//cout << "||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||";
+				//cout << endl << returnID(*lowest1) << " X " << returnID(*lowest2) << " - " << returnID(*lowest2V) << endl;
+				//cout << "Custo: " << lowestCost << endl;
+				//cout << "Direto? " << isDirectLow << endl;
+
+				// criacao de um vetor baseado no menor custo
+				vector<point2D> vectorToInsert = createNewVector(lowest2, lowest2V, lowBegin, lowEnd, isDirectLow);
+
+				// insercao do vetor criado no vetor alvo (lowest1)
+				// +1 pq a funcao insert() insere na posicao anterior ao ponteiro dado
+				cycle[insertI].insert(lowest1 + 1, vectorToInsert.begin(), vectorToInsert.end());
+
+				// o vetor que foi inserido eh apagado
+				cycle.erase(eraseP);
+
+				cycleCost = returnCycleCost(cycle);
+
+				if (cycleCost < bestCaseCost) {
+					bestCase = cycle;
+					bestCaseCost = cycleCost;
+				}
+
+				// prints para auxiliar o debug
+
+				/*
+				for (std::vector<point2D>::iterator it1 = cycle[insertI].begin(); it1 != cycle[insertI].end(); ++it1) {
+					cout << returnID(*it1) << ">";
+				}
+
+				cout << endl << endl;
+				*/
+
 			}
 
-			cout << "Custo: " << fixed << bestCaseCost << endl;
+			//cout << "Best case : " << endl << endl;
 
-			cout << inst << endl;
+			//printCycle(bestCase);
 
-			inst++;
+			cout << fixed << endl << "Custo: " << bestCaseCost << endl;
 
 			// print do tempo de execucao
-			cout  << "Time taken: " << (double)(clock() - tStart) / CLOCKS_PER_SEC << endl << endl;
+			printf("Time taken: %.2fs\n", (double)(clock() - tStart) / CLOCKS_PER_SEC);
 
-			myfile << string(data.cFileName) << "|" << intDIM / 2 << "|" << fixed << bestCaseCost << "|" << nClusters << "|" << ("%.5fs\n", (double)(clock() - tStart) / CLOCKS_PER_SEC) << "\n";
+			cout << endl << endl;
+
+			myfile << string(data.cFileName) << "|" << intDIM/2 << "|" << fixed << bestCaseCost << "|" << ("%.5fs\n", (double)(clock() - tStart) / CLOCKS_PER_SEC) << "\n";
 
 			inFile.close();
+
 		} while (FindNextFile(hFind, &data));
 		FindClose(hFind);
 	}
